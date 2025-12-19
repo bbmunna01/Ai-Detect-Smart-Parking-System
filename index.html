@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Parking Dashboard - Live</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .connection-status {
+            display: inline-block;
+            padding: 8px 20px;
+            border-radius: 20px;
+            font-weight: bold;
+            margin-top: 10px;
+        }
+
+        .connected {
+            background: #4caf50;
+            color: white;
+        }
+
+        .disconnected {
+            background: #f44336;
+            color: white;
+        }
+
+        .capacity-section {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 15px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        .capacity-counter {
+            font-size: 4em;
+            font-weight: bold;
+            text-align: center;
+            margin: 20px 0;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .capacity-bar {
+            display: flex;
+            gap: 10px;
+            margin: 20px 0;
+            justify-content: center;
+        }
+
+        .capacity-slot {
+            width: 60px;
+            height: 80px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2em;
+            transition: all 0.3s ease;
+            border: 2px solid rgba(255,255,255,0.3);
+        }
+
+        .capacity-slot.filled {
+            background: rgba(255,255,255,0.9);
+            color: #667eea;
+            transform: scale(1.1);
+        }
+
+        .gate-status {
+            text-align: center;
+            padding: 20px;
+            border-radius: 10px;
+            font-size: 1.5em;
+            font-weight: bold;
+            margin-top: 20px;
+            transition: all 0.3s ease;
+        }
+
+        .gate-open {
+            background: #4caf50;
+            color: white;
+            animation: pulse 1.5s infinite;
+        }
+
+        .gate-closed {
+            background: #f44336;
+            color: white;
+        }
+
+        .gate-full {
+            background: #ff9800;
+            color: white;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        .card-header {
+            font-size: 1.2em;
+            font-weight: bold;
+            margin-bottom: 15px;
+            color: #667eea;
+        }
+
+        .sensor-value {
+            font-size: 2em;
+            font-weight: bold;
+            text-align: center;
+            margin: 15px 0;
+            color: #667eea;
+        }
+
+        .timestamp {
+            text-align: center;
+            color: white;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚗 Smart Parking System</h1>
+            <p>Real-time MQTT Dashboard</p>
+            <div id="connectionStatus" class="connection-status disconnected">
+                ⚠️ Connecting to MQTT...
+            </div>
+        </div>
+
+        <div class="capacity-section">
+            <div class="capacity-counter" id="counter">0 / 5</div>
+            <div class="capacity-bar">
+                <div class="capacity-slot" id="slot1"></div>
+                <div class="capacity-slot" id="slot2"></div>
+                <div class="capacity-slot" id="slot3"></div>
+                <div class="capacity-slot" id="slot4"></div>
+                <div class="capacity-slot" id="slot5"></div>
+            </div>
+            <div class="gate-status gate-closed" id="gateStatus">GATE CLOSED</div>
+        </div>
+
+        <div class="dashboard">
+            <div class="card">
+                <div class="card-header">📊 Parking Info</div>
+                <div class="sensor-value" id="available">5 spaces</div>
+                <p style="text-align: center;">Available</p>
+            </div>
+
+            <div class="card">
+                <div class="card-header">📏 Distance Sensor</div>
+                <div class="sensor-value" id="distance">-- cm</div>
+                <p style="text-align: center;">Last Reading</p>
+            </div>
+
+            <div class="card">
+                <div class="card-header">🚘 Detection Status</div>
+                <div class="sensor-value" id="carDetected">NO</div>
+                <p style="text-align: center;">Car Detected</p>
+            </div>
+        </div>
+
+        <div class="timestamp" id="timestamp">Waiting for data...</div>
+    </div>
+
+    <script>
+        // ⚠️ CHANGE THESE TO YOUR HIVEMQ DETAILS ⚠️
+        const mqtt_host = 'b78e6b1625884b0c833857b33d446517.s1.eu.hivemq.cloud';
+        const mqtt_port = 8884; // WebSocket port
+        const mqtt_user = 'parking_user';
+        const mqtt_pass = 'Parking123!';
+        const topic = 'parking/status';
+
+        let client;
+
+        function connectMQTT() {
+            // Generate random client ID
+            const clientId = 'dashboard_' + Math.random().toString(16).substr(2, 8);
+            
+            client = new Paho.MQTT.Client(mqtt_host, mqtt_port, clientId);
+            
+            // Set callback handlers
+            client.onConnectionLost = onConnectionLost;
+            client.onMessageArrived = onMessageArrived;
+            
+            // Connect with SSL
+            const options = {
+                useSSL: true,
+                userName: mqtt_user,
+                password: mqtt_pass,
+                onSuccess: onConnect,
+                onFailure: onFailure
+            };
+            
+            console.log('Connecting to MQTT broker...');
+            client.connect(options);
+        }
+
+        function onConnect() {
+            console.log('✓ Connected to MQTT!');
+            document.getElementById('connectionStatus').className = 'connection-status connected';
+            document.getElementById('connectionStatus').textContent = '✓ Connected to MQTT';
+            
+            // Subscribe to topic
+            client.subscribe(topic);
+            console.log('Subscribed to:', topic);
+        }
+
+        function onFailure(message) {
+            console.error('Connection failed:', message.errorMessage);
+            document.getElementById('connectionStatus').textContent = '❌ Connection Failed';
+            
+            // Retry after 5 seconds
+            setTimeout(connectMQTT, 5000);
+        }
+
+        function onConnectionLost(responseObject) {
+            if (responseObject.errorCode !== 0) {
+                console.log('Connection lost:', responseObject.errorMessage);
+                document.getElementById('connectionStatus').className = 'connection-status disconnected';
+                document.getElementById('connectionStatus').textContent = '⚠️ Reconnecting...';
+                
+                // Reconnect
+                setTimeout(connectMQTT, 2000);
+            }
+        }
+
+        function onMessageArrived(message) {
+            console.log('Message received:', message.payloadString);
+            
+            try {
+                const data = JSON.parse(message.payloadString);
+                updateDashboard(data);
+            } catch (error) {
+                console.error('JSON parse error:', error);
+            }
+        }
+
+        function updateDashboard(data) {
+            // Update car count
+            document.getElementById('counter').textContent = 
+                `${data.car_count} / ${data.capacity}`;
+            
+            // Update available spaces
+            document.getElementById('available').textContent = 
+                `${data.available} spaces`;
+            
+            // Update distance
+            if (data.distance_cm > 0) {
+                document.getElementById('distance').textContent = 
+                    data.distance_cm.toFixed(1) + ' cm';
+            }
+            
+            // Update car detection
+            document.getElementById('carDetected').textContent = 
+                data.car_detected ? 'YES ✓' : 'NO';
+            document.getElementById('carDetected').style.color = 
+                data.car_detected ? '#4caf50' : '#f44336';
+            
+            // Update capacity slots
+            for (let i = 1; i <= 5; i++) {
+                const slot = document.getElementById(`slot${i}`);
+                if (i <= data.car_count) {
+                    slot.classList.add('filled');
+                    slot.textContent = '🚗';
+                } else {
+                    slot.classList.remove('filled');
+                    slot.textContent = '';
+                }
+            }
+            
+            // Update gate status
+            const gateElement = document.getElementById('gateStatus');
+            if (data.full) {
+                gateElement.className = 'gate-status gate-full';
+                gateElement.textContent = '⚠️ PARKING FULL';
+            } else if (data.gate_open) {
+                gateElement.className = 'gate-status gate-open';
+                gateElement.textContent = '✓ GATE OPEN';
+            } else {
+                gateElement.className = 'gate-status gate-closed';
+                gateElement.textContent = '● GATE CLOSED';
+            }
+            
+            // Update timestamp
+            document.getElementById('timestamp').textContent = 
+                'Last updated: ' + new Date().toLocaleTimeString();
+        }
+
+        // Connect when page loads
+        window.onload = function() {
+            connectMQTT();
+        };
+    </script>
+</body>
+</html>
