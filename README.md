@@ -2,21 +2,6 @@
 
 An intelligent parking management system using ESP32-CAM for AI-based car detection, ultrasonic distance sensing, and automated gate control with Arduino MKR WiFi 1010.
 
-📋 Table of Contents
-- [Overview](#overview)
-- [Features](#features)
-- [Hardware Requirements](#hardware-requirements)
-- [Software Requirements](#software-requirements)
-- [System Architecture](#system-architecture)
-- [Installation](#installation)
-- [Wiring Diagram](#wiring-diagram)
-- [Configuration](#configuration)
-- [Usage](#usage)
-- [JSON Data Format](#json-data-format)
-- [Troubleshooting](#troubleshooting)
-- [Contributing](#contributing)
-- [License](#license)
-
 🎯 Overview
 
 This smart parking system combines computer vision, ultrasonic sensing, and automated gate control to manage parking lot capacity efficiently. The system uses Edge Impulse AI model for real-time car detection and communicates via serial protocol for gate automation.
@@ -57,14 +42,13 @@ This smart parking system combines computer vision, ultrasonic sensing, and auto
 ## 🛠 Hardware Requirements
 
 ### ESP32-CAM Module
-- **Board:** ESP32-CAM AI-Thinker
-- **Camera:** OV2640
-- **RAM:** 4MB PSRAM
+- **Board:** ESP32-CAM
+- **RAM:** 4MB
 - **Power:** 5V via USB or external supply
 
 ### Arduino MKR WiFi 1010
 - **Microcontroller:** SAMD21 Cortex-M0+ 32bit
-- **Connectivity:** WiFi (optional for future expansion)
+- **Connectivity:** WiFi
 - **Power:** 5V via USB or VIN
 
 ### Additional Components
@@ -200,7 +184,6 @@ Follow the [Software Requirements](#software-requirements) section above.
 |---------------|-----------|----------|
 | GPIO 13 | HC-SR04 TRIG | TRIG Pin |
 | GPIO 15 | HC-SR04 ECHO | ECHO Pin |
-| GPIO 12 | Signal Output | (Optional) |
 | GPIO 1 (TX) | Arduino MKR RX | Pin 13 |
 | GPIO 3 (RX) | Arduino MKR TX | Pin 14 |
 | GND | Common Ground | GND |
@@ -226,8 +209,6 @@ Follow the [Software Requirements](#software-requirements) section above.
 | GND | GND |
 
 ### Power Supply Notes
-- ESP32-CAM requires stable 5V/2A supply
-- Servo motor may need separate power if using multiple servos
 - Use common ground for all components
 
 ## ⚙️ Configuration
